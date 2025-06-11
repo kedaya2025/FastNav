@@ -58,21 +58,10 @@ export async function getCurrentData() {
       }
     }
 
-    // 如果数据库有数据，使用数据库数据
-    if (dbCategories && dbWebsites) {
-      return {
-        categories: dbCategories,
-        websites: dbWebsites
-      }
-    }
-
-    // 否则 fallback 到 localStorage
-    const adminCategories = localStorage.getItem('fastnav_admin_categories')
-    const adminWebsites = localStorage.getItem('fastnav_admin_websites')
-
+    // 使用数据库数据或默认数据
     return {
-      categories: adminCategories ? JSON.parse(adminCategories) : categories,
-      websites: adminWebsites ? JSON.parse(adminWebsites) : defaultWebsites
+      categories: dbCategories || categories,
+      websites: dbWebsites || defaultWebsites
     }
   } catch {
     return { categories, websites: defaultWebsites }
@@ -81,21 +70,7 @@ export async function getCurrentData() {
 
 // 同步版本，用于服务端渲染和需要立即返回的场景
 export function getCurrentDataSync() {
-  if (typeof window === 'undefined') {
-    return { categories, websites: defaultWebsites }
-  }
-
-  try {
-    const adminCategories = localStorage.getItem('fastnav_admin_categories')
-    const adminWebsites = localStorage.getItem('fastnav_admin_websites')
-
-    return {
-      categories: adminCategories ? JSON.parse(adminCategories) : categories,
-      websites: adminWebsites ? JSON.parse(adminWebsites) : defaultWebsites
-    }
-  } catch {
-    return { categories, websites: defaultWebsites }
-  }
+  return { categories, websites: defaultWebsites }
 }
 
 export const defaultWebsites: Website[] = [

@@ -17,7 +17,6 @@ import {
   Github
 } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle'
-import DataMigration from '../components/DataMigration'
 import SettingsModal from '../components/SettingsModal'
 import { categories as initialCategories, websites as initialWebsites, Website } from '@/lib/data'
 import { AdminDataManager } from '@/lib/admin-data'
@@ -50,7 +49,6 @@ export default function AdminDashboard() {
     category: string
   } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [showMigration, setShowMigration] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const router = useRouter()
 
@@ -69,14 +67,8 @@ export default function AdminDashboard() {
         if (now - loginTimestamp < twentyFourHours) {
           setIsAuthenticated(true)
 
-          // 检查是否需要显示数据迁移提示
-          setShowMigration(AdminDataManager.hasLocalStorageData())
-
           try {
-            // 初始化数据
-            await AdminDataManager.initializeData(initialCategories, initialWebsites)
-
-            // 加载保存的数据
+            // 直接从数据库加载数据
             const savedCategories = await AdminDataManager.getCategories()
             const savedWebsites = await AdminDataManager.getWebsites()
 
@@ -87,21 +79,14 @@ export default function AdminDashboard() {
             }
             if (savedWebsites.length > 0) {
               setWebsites(savedWebsites)
+            } else {
+              setWebsites(initialWebsites)
             }
           } catch (error) {
             console.error('数据加载失败:', error)
-            // Fallback 到同步方法
-            const savedCategories = AdminDataManager.getCategoriesSync()
-            const savedWebsites = AdminDataManager.getWebsitesSync()
-
-            if (savedCategories.length > 0) {
-              setCategories(savedCategories.filter(cat => cat.id !== 'all'))
-            } else {
-              setCategories(initialCategories.filter(cat => cat.id !== 'all'))
-            }
-            if (savedWebsites.length > 0) {
-              setWebsites(savedWebsites)
-            }
+            // 使用默认数据
+            setCategories(initialCategories.filter(cat => cat.id !== 'all'))
+            setWebsites(initialWebsites)
           }
 
           setIsLoading(false)
@@ -235,23 +220,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleMigrationComplete = async () => {
-    setShowMigration(false)
-    // 重新加载数据
-    try {
-      const savedCategories = await AdminDataManager.getCategories()
-      const savedWebsites = await AdminDataManager.getWebsites()
 
-      if (savedCategories.length > 0) {
-        setCategories(savedCategories.filter(cat => cat.id !== 'all'))
-      }
-      if (savedWebsites.length > 0) {
-        setWebsites(savedWebsites)
-      }
-    } catch (error) {
-      console.error('重新加载数据失败:', error)
-    }
-  }
 
   if (!isAuthenticated || isLoading) {
     return (
@@ -540,11 +509,6 @@ export default function AdminDashboard() {
 
               {/* Scrollable Websites Content */}
               <main className="flex-1 overflow-y-auto p-6">
-                {/* Data Migration Component */}
-                {showMigration && (
-                  <DataMigration onMigrationComplete={handleMigrationComplete} />
-                )}
-
                 {/* Current Category Websites */}
                 <div className="space-y-2">
                   {websites

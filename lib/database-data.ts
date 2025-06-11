@@ -152,52 +152,7 @@ export class DatabaseDataManager {
     }
   }
 
-  // 数据迁移 - 将 localStorage 数据迁移到数据库
-  static async migrateFromLocalStorage(): Promise<{ success: boolean; message: string }> {
-    try {
-      // 从 localStorage 获取数据
-      const adminCategories = localStorage.getItem('fastnav_admin_categories')
-      const adminWebsites = localStorage.getItem('fastnav_admin_websites')
 
-      const categories = adminCategories ? JSON.parse(adminCategories) : []
-      const websites = adminWebsites ? JSON.parse(adminWebsites) : []
-
-      if (categories.length === 0 && websites.length === 0) {
-        return { success: true, message: '没有需要迁移的数据' }
-      }
-
-      const response = await fetch('/api/migrate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ categories, websites }),
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        // 迁移成功后清除 localStorage 数据
-        localStorage.removeItem('fastnav_admin_categories')
-        localStorage.removeItem('fastnav_admin_websites')
-      }
-
-      return data
-    } catch (error) {
-      console.error('数据迁移失败:', error)
-      return { success: false, message: '数据迁移失败' }
-    }
-  }
-
-  // 检查是否有 localStorage 数据需要迁移
-  static hasLocalStorageData(): boolean {
-    if (typeof window === 'undefined') return false
-    
-    const adminCategories = localStorage.getItem('fastnav_admin_categories')
-    const adminWebsites = localStorage.getItem('fastnav_admin_websites')
-    
-    return !!(adminCategories || adminWebsites)
-  }
 }
 
 // React Hook for database data management
@@ -211,7 +166,5 @@ export function useDatabaseData() {
     addWebsite: DatabaseDataManager.addWebsite,
     updateWebsite: DatabaseDataManager.updateWebsite,
     deleteWebsite: DatabaseDataManager.deleteWebsite,
-    migrateFromLocalStorage: DatabaseDataManager.migrateFromLocalStorage,
-    hasLocalStorageData: DatabaseDataManager.hasLocalStorageData,
   }
 }
