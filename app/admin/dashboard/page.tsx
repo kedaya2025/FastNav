@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle'
 import DataMigration from '../components/DataMigration'
+import SettingsModal from '../components/SettingsModal'
 import { categories as initialCategories, websites as initialWebsites, Website } from '@/lib/data'
 import { AdminDataManager } from '@/lib/admin-data'
 
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
   } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showMigration, setShowMigration] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -279,7 +281,7 @@ export default function AdminDashboard() {
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
-                onClick={() => router.push('/admin/settings')}
+                onClick={() => setShowSettingsModal(true)}
                 className="text-muted-foreground hover:text-foreground"
               >
                 网站设置
@@ -720,6 +722,12 @@ export default function AdminDashboard() {
           </div>
         </div>
       </footer>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
 
     </div>
   )
