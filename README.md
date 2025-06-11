@@ -44,16 +44,6 @@ npm run dev
 #### 一键部署
 点击上方 "Deploy to Vercel" 按钮，配置环境变量即可。
 
-#### 手动部署
-```bash
-npm run deploy
-```
-
-#### Supabase 配置
-1. 创建 [Supabase](https://supabase.com) 项目（选择香港区域）
-2. 获取项目 URL 和 API 密钥
-3. 在 Vercel 中配置环境变量
-4. 访问 `https://your-app.vercel.app/api/migrate` 初始化数据库
 
 ## 🔧 环境变量
 

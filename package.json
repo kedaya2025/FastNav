@@ -9,10 +9,11 @@
     "lint": "next lint",
     "deploy": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh",
     "migrate:prod": "node scripts/migrate-production.js",
-    "db:init": "node scripts/init-database.js",
+    "db:init": "node scripts/init-db.js",
     "db:check": "node scripts/check-db.js"
   },
   "dependencies": {
+    "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@supabase/supabase-js": "^2.50.0",
     "@types/pg": "^8.15.4",
@@ -23,6 +24,7 @@
     "pg": "^8.16.0",
     "react": "^18",
     "react-dom": "^18",
+    "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"
   },

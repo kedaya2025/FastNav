@@ -24,6 +24,15 @@ CREATE TABLE IF NOT EXISTS websites (
   FOREIGN KEY (category) REFERENCES categories(id) ON DELETE CASCADE
 );
 
+-- 创建设置表
+CREATE TABLE IF NOT EXISTS settings (
+  id SERIAL PRIMARY KEY,
+  key TEXT UNIQUE NOT NULL,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 创建更新时间触发器函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -40,9 +49,15 @@ CREATE TRIGGER update_categories_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- 为网站表添加更新时间触发器
-CREATE TRIGGER update_websites_updated_at 
-    BEFORE UPDATE ON websites 
-    FOR EACH ROW 
+CREATE TRIGGER update_websites_updated_at
+    BEFORE UPDATE ON websites
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- 为设置表添加更新时间触发器
+CREATE TRIGGER update_settings_updated_at
+    BEFORE UPDATE ON settings
+    FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- 插入默认分类数据
@@ -104,3 +119,10 @@ INSERT INTO websites (id, name, url, description, category, color) VALUES
   ('24', 'Coursera', 'https://www.coursera.org', '在线课程学习平台', 'education', '#0056d3'),
   ('25', 'Khan Academy', 'https://www.khanacademy.org', '免费在线教育平台', 'education', '#14bf96')
 ON CONFLICT (id) DO NOTHING;
+
+-- 插入默认设置数据
+INSERT INTO settings (key, value) VALUES
+  ('site_title', 'FastNav - 现代化网址导航'),
+  ('site_description', '简约时尚的网址导航站点，快速访问您喜爱的网站'),
+  ('site_keywords', '网址导航,书签,网站收藏,快速导航,团队导航')
+ON CONFLICT (key) DO NOTHING;

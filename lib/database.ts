@@ -129,6 +129,14 @@ export interface DatabaseWebsite {
   updated_at: string
 }
 
+export interface DatabaseSettings {
+  id: number
+  key: string
+  value: string
+  created_at: string
+  updated_at: string
+}
+
 // 分类相关数据库操作
 export class CategoryDB {
   // 获取所有分类
@@ -273,6 +281,118 @@ export class WebsiteDB {
         )
       }
     })
+  }
+}
+
+// 设置相关数据库操作
+export class SettingsDB {
+  // 获取设置值
+  static async get(key: string): Promise<string | null> {
+    if (isProduction && supabase) {
+      // 生产环境：使用 Supabase
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', key)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') return null // 记录不存在
+        throw error
+      }
+      return data?.value || null
+    } else if (pool) {
+      // 开发环境：使用 PostgreSQL
+      const result = await query('SELECT value FROM settings WHERE key = $1', [key])
+      return result.rows.length > 0 ? result.rows[0].value : null
+    } else {
+      throw new Error('数据库连接未初始化')
+    }
+  }
+
+  // 设置值
+  static async set(key: string, value: string): Promise<void> {
+    if (isProduction && supabase) {
+      // 生产环境：使用 Supabase
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ key, value }, { onConflict: 'key' })
+
+      if (error) throw error
+    } else if (pool) {
+      // 开发环境：使用 PostgreSQL
+      await query(
+        `INSERT INTO settings (key, value)
+         VALUES ($1, $2)
+         ON CONFLICT (key)
+         DO UPDATE SET value = $2, updated_at = NOW()`,
+        [key, value]
+      )
+    } else {
+      throw new Error('数据库连接未初始化')
+    }
+  }
+
+  // 获取多个设置
+  static async getMultiple(keys: string[]): Promise<Record<string, string>> {
+    if (isProduction && supabase) {
+      // 生产环境：使用 Supabase
+      const { data, error } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', keys)
+
+      if (error) throw error
+
+      const result: Record<string, string> = {}
+      data?.forEach(item => {
+        result[item.key] = item.value
+      })
+      return result
+    } else if (pool) {
+      // 开发环境：使用 PostgreSQL
+      const placeholders = keys.map((_, index) => `$${index + 1}`).join(',')
+      const result = await query(
+        `SELECT key, value FROM settings WHERE key IN (${placeholders})`,
+        keys
+      )
+
+      const settings: Record<string, string> = {}
+      result.rows.forEach((row: any) => {
+        settings[row.key] = row.value
+      })
+      return settings
+    } else {
+      throw new Error('数据库连接未初始化')
+    }
+  }
+
+  // 批量设置
+  static async setMultiple(settings: Record<string, string>): Promise<void> {
+    if (isProduction && supabase) {
+      // 生产环境：使用 Supabase
+      const data = Object.entries(settings).map(([key, value]) => ({ key, value }))
+      const { error } = await supabase
+        .from('settings')
+        .upsert(data, { onConflict: 'key' })
+
+      if (error) throw error
+    } else if (pool) {
+      // 开发环境：使用 PostgreSQL
+      await transaction(async (client) => {
+        for (const [key, value] of Object.entries(settings)) {
+          await client.query(
+            `INSERT INTO settings (key, value)
+             VALUES ($1, $2)
+             ON CONFLICT (key)
+             DO UPDATE SET value = $2, updated_at = NOW()`,
+            [key, value]
+          )
+        }
+      })
+    } else {
+      throw new Error('数据库连接未初始化')
+    }
   }
 }
 

@@ -215,10 +215,10 @@ export default function Home() {
               {/* GitHub Icon */}
               <Button variant="ghost" size="icon" asChild>
                 <a
-                  href="https://github.com"
+                  href="https://github.com/kedaya2025/FastNav"
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="访问GitHub"
+                  aria-label="访问GitHub仓库"
                 >
                   <Icons.Github className="w-4 h-4" />
                 </a>

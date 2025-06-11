@@ -279,6 +279,13 @@ export default function AdminDashboard() {
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
+                onClick={() => router.push('/admin/settings')}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                网站设置
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => router.push('/')}
                 className="text-muted-foreground hover:text-foreground"
               >
@@ -701,10 +708,10 @@ export default function AdminDashboard() {
               {/* GitHub Icon */}
               <Button variant="ghost" size="icon" asChild>
                 <a
-                  href="https://github.com"
+                  href="https://github.com/kedaya2025/FastNav"
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="访问GitHub"
+                  aria-label="访问GitHub仓库"
                 >
                   <Github className="w-4 h-4" />
                 </a>
