@@ -2,7 +2,7 @@
 
 现代化的团队导航应用，快速访问常用网站和工具。
 
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/fastnav&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_USERNAME,ADMIN_PASSWORD&regions=hkg1)
+[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/kedaya2025/FastNav&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_USERNAME,ADMIN_PASSWORD&regions=hkg1)
 
 ## ✨ 特性
 
@@ -21,8 +21,8 @@ Next.js 14 + TypeScript + Tailwind CSS + Supabase + Vercel
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/fastnav.git
-cd fastnav
+git clone https://github.com/kedaya2025/FastNav.git
+cd FastNav
 
 # 安装依赖
 npm install
