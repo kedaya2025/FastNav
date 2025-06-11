@@ -170,17 +170,29 @@ export class CategoryDB {
 
   // 批量更新分类
   static async upsertMany(categories: Omit<DatabaseCategory, 'created_at' | 'updated_at'>[]): Promise<void> {
-    await transaction(async (client) => {
-      for (const category of categories) {
-        await client.query(
-          `INSERT INTO categories (id, name, icon) 
-           VALUES ($1, $2, $3) 
-           ON CONFLICT (id) 
-           DO UPDATE SET name = $2, icon = $3, updated_at = NOW()`,
-          [category.id, category.name, category.icon]
-        )
-      }
-    })
+    if (isProduction && supabase) {
+      // 生产环境：使用 Supabase 批量操作
+      const { error } = await supabase
+        .from('categories')
+        .upsert(categories, { onConflict: 'id' })
+
+      if (error) throw error
+    } else if (pool) {
+      // 开发环境：使用 PostgreSQL 事务
+      await transaction(async (client) => {
+        for (const category of categories) {
+          await client.query(
+            `INSERT INTO categories (id, name, icon)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (id)
+             DO UPDATE SET name = $2, icon = $3, updated_at = NOW()`,
+            [category.id, category.name, category.icon]
+          )
+        }
+      })
+    } else {
+      throw new Error('数据库连接未初始化')
+    }
   }
 }
 
@@ -263,24 +275,36 @@ export class WebsiteDB {
 
   // 批量更新网站
   static async upsertMany(websites: Omit<DatabaseWebsite, 'created_at' | 'updated_at'>[]): Promise<void> {
-    await transaction(async (client) => {
-      for (const website of websites) {
-        await client.query(
-          `INSERT INTO websites (id, name, url, description, category, icon, color) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7) 
-           ON CONFLICT (id) 
-           DO UPDATE SET 
-             name = $2, 
-             url = $3, 
-             description = $4, 
-             category = $5, 
-             icon = $6, 
-             color = $7, 
-             updated_at = NOW()`,
-          [website.id, website.name, website.url, website.description, website.category, website.icon, website.color]
-        )
-      }
-    })
+    if (isProduction && supabase) {
+      // 生产环境：使用 Supabase 批量操作
+      const { error } = await supabase
+        .from('websites')
+        .upsert(websites, { onConflict: 'id' })
+
+      if (error) throw error
+    } else if (pool) {
+      // 开发环境：使用 PostgreSQL 事务
+      await transaction(async (client) => {
+        for (const website of websites) {
+          await client.query(
+            `INSERT INTO websites (id, name, url, description, category, icon, color)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (id)
+             DO UPDATE SET
+               name = $2,
+               url = $3,
+               description = $4,
+               category = $5,
+               icon = $6,
+               color = $7,
+               updated_at = NOW()`,
+            [website.id, website.name, website.url, website.description, website.category, website.icon, website.color]
+          )
+        }
+      })
+    } else {
+      throw new Error('数据库连接未初始化')
+    }
   }
 }
 
