@@ -345,7 +345,7 @@ export class SettingsDB {
       if (error) throw error
 
       const result: Record<string, string> = {}
-      data?.forEach(item => {
+      data?.forEach((item: { key: string; value: string }) => {
         result[item.key] = item.value
       })
       return result
