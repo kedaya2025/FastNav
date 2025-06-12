@@ -29,9 +29,8 @@ if (process.env.POSTGRES_URL) {
   pool = new Pool({
     connectionString: process.env.POSTGRES_URL,
     ssl: isProduction ? {
-      rejectUnauthorized: false,
-      require: true
-    } : false,
+      rejectUnauthorized: false
+    } : undefined,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
@@ -48,9 +47,8 @@ if (process.env.POSTGRES_URL) {
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     ssl: isProduction ? {
-      rejectUnauthorized: false,
-      require: true
-    } : false,
+      rejectUnauthorized: false
+    } : undefined,
   })
 }
 
