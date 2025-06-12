@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
       // 批量插入分类数据
       console.log('📝 插入分类数据...')
       await CategoryDB.upsertMany(defaultCategories)
-      
+
       // 批量插入网站数据
       console.log('🌐 插入网站数据...')
       await WebsiteDB.upsertMany(defaultWebsites)
-      
+
       // 批量插入设置数据
       console.log('⚙️ 插入设置数据...')
       await SettingsDB.setMultiple(defaultSettings)
@@ -88,73 +88,59 @@ export async function POST(request: NextRequest) {
 
     } catch (dbError: any) {
       console.error('❌ 数据库操作失败:', dbError)
-      
-      // 如果是表不存在的错误，返回特殊提示
+
+      // 如果是表不存在的错误，尝试自动创建表
       if (dbError?.code === '42P01') {
-        return NextResponse.json({
-          success: false,
-          message: '数据库表不存在，请先在 Supabase Dashboard 中创建表结构',
-          error: 'TABLES_NOT_EXIST',
-          sqlScript: `
--- 请在 Supabase Dashboard 的 SQL Editor 中执行以下脚本:
+        console.log('🔄 检测到表不存在，尝试自动创建表...')
 
-CREATE TABLE IF NOT EXISTS categories (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  icon TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+        try {
+          // 调用建表API
+          const createTablesResponse = await fetch(`${request.url.replace('/init-db', '/create-tables')}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ adminPassword }),
+          })
 
-CREATE TABLE IF NOT EXISTS websites (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  url TEXT NOT NULL,
-  description TEXT NOT NULL,
-  category TEXT NOT NULL,
-  icon TEXT,
-  color TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  FOREIGN KEY (category) REFERENCES categories(id) ON DELETE CASCADE
-);
+          const createResult = await createTablesResponse.json()
 
-CREATE TABLE IF NOT EXISTS settings (
-  id SERIAL PRIMARY KEY,
-  key TEXT UNIQUE NOT NULL,
-  value TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+          if (createResult.success) {
+            console.log('✅ 表创建成功，重新尝试初始化...')
 
--- 创建更新时间触发器函数
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
+            // 重新尝试初始化
+            await CategoryDB.upsertMany(defaultCategories)
+            await WebsiteDB.upsertMany(defaultWebsites)
+            await SettingsDB.setMultiple(defaultSettings)
 
--- 为分类表添加更新时间触发器
-CREATE TRIGGER update_categories_updated_at 
-    BEFORE UPDATE ON categories 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
+            return NextResponse.json({
+              success: true,
+              message: '数据库表创建并初始化成功',
+              data: {
+                categories: defaultCategories.length,
+                websites: defaultWebsites.length,
+                settings: Object.keys(defaultSettings).length
+              },
+              autoCreated: true
+            })
+          } else {
+            return NextResponse.json({
+              success: false,
+              message: '无法自动创建表，请手动创建',
+              error: 'AUTO_CREATE_FAILED',
+              createResult: createResult
+            }, { status: 503 })
+          }
+        } catch (createError: any) {
+          console.error('❌ 自动创建表失败:', createError)
 
--- 为网站表添加更新时间触发器
-CREATE TRIGGER update_websites_updated_at
-    BEFORE UPDATE ON websites
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- 为设置表添加更新时间触发器
-CREATE TRIGGER update_settings_updated_at
-    BEFORE UPDATE ON settings
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-          `
-        }, { status: 503 })
+          return NextResponse.json({
+            success: false,
+            message: '数据库表不存在且无法自动创建',
+            error: 'TABLES_NOT_EXIST',
+            hint: '请先调用 /api/admin/create-tables 创建表结构'
+          }, { status: 503 })
+        }
       }
 
       return NextResponse.json({
