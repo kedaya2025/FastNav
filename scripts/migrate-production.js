@@ -23,47 +23,80 @@ async function migrateProduction() {
   try {
     console.log('📊 创建分类表...')
     
-    // 创建分类表
-    const { error: categoriesError } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE TABLE IF NOT EXISTS categories (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          icon TEXT NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-      `
-    })
+    // 注意：Supabase 不支持直接执行 SQL，需要通过 Supabase Dashboard 手动创建表
+    // 或者使用 Supabase CLI 进行迁移
+    console.log('⚠️  请在 Supabase Dashboard 中手动执行以下 SQL:')
+    console.log(`
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-    if (categoriesError) {
-      console.error('❌ 创建分类表失败:', categoriesError)
-      throw categoriesError
-    }
+CREATE TABLE IF NOT EXISTS websites (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL,
+  icon TEXT,
+  color TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (category) REFERENCES categories(id) ON DELETE CASCADE
+);
 
-    console.log('🌐 创建网站表...')
-    
-    // 创建网站表
-    const { error: websitesError } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE TABLE IF NOT EXISTS websites (
-          id SERIAL PRIMARY KEY,
-          name TEXT NOT NULL,
-          url TEXT NOT NULL,
-          description TEXT,
-          category TEXT NOT NULL,
-          icon TEXT,
-          color TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          FOREIGN KEY (category) REFERENCES categories(id)
-        );
-      `
-    })
+CREATE TABLE IF NOT EXISTS settings (
+  id SERIAL PRIMARY KEY,
+  key TEXT UNIQUE NOT NULL,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-    if (websitesError) {
-      console.error('❌ 创建网站表失败:', websitesError)
-      throw websitesError
+-- 创建更新时间触发器函数
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- 为分类表添加更新时间触发器
+CREATE TRIGGER update_categories_updated_at
+    BEFORE UPDATE ON categories
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- 为网站表添加更新时间触发器
+CREATE TRIGGER update_websites_updated_at
+    BEFORE UPDATE ON websites
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- 为设置表添加更新时间触发器
+CREATE TRIGGER update_settings_updated_at
+    BEFORE UPDATE ON settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+    `)
+
+    console.log('🔄 尝试检查表是否存在...')
+
+    // 检查表是否存在
+    const { data: tables, error: tablesError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .in('table_name', ['categories', 'websites', 'settings'])
+
+    if (tablesError) {
+      console.log('⚠️  无法检查表结构，请确保已在 Supabase Dashboard 中创建表')
+    } else {
+      console.log(`✅ 找到 ${tables?.length || 0} 个表`)
     }
 
     console.log('📝 插入初始分类数据...')
