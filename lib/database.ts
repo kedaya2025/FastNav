@@ -4,10 +4,9 @@ import { createClient } from '@supabase/supabase-js'
 // 检查是否为生产环境
 const isProduction = process.env.NODE_ENV === 'production'
 
-// Supabase 客户端 (生产环境)
+// Supabase 客户端
 let supabase: any = null
-if (isProduction &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+if (process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.SUPABASE_SERVICE_ROLE_KEY &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== 'your_supabase_project_url' &&
     process.env.SUPABASE_SERVICE_ROLE_KEY !== 'your_supabase_service_role_key') {
@@ -22,9 +21,20 @@ if (isProduction &&
   }
 }
 
-// PostgreSQL 连接池 (开发环境)
+// PostgreSQL 连接池
 let pool: Pool | null = null
-if (!isProduction) {
+
+// 优先使用 POSTGRES_URL (Vercel 自动注入)
+if (process.env.POSTGRES_URL) {
+  pool = new Pool({
+    connectionString: process.env.POSTGRES_URL,
+    ssl: isProduction ? { rejectUnauthorized: false } : false,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  })
+} else if (process.env.DB_HOST || !isProduction) {
+  // 使用单独的环境变量或本地开发配置
   pool = new Pool({
     host: process.env.DB_HOST || '127.0.0.1',
     port: parseInt(process.env.DB_PORT || '5432'),
@@ -34,27 +44,27 @@ if (!isProduction) {
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
-    ssl: false, // 本地数据库不需要 SSL
+    ssl: isProduction ? { rejectUnauthorized: false } : false,
   })
 }
 
 // 数据库连接测试
 export async function testConnection(): Promise<boolean> {
   try {
-    if (isProduction && supabase) {
-      // 生产环境：测试 Supabase 连接
-      const { error } = await supabase.from('categories').select('count', { count: 'exact', head: true })
-      if (!error) {
-        console.log('✅ Supabase 数据库连接成功')
-        return true
-      }
-    } else if (pool) {
-      // 开发环境：测试 PostgreSQL 连接
+    if (pool) {
+      // 优先使用 PostgreSQL 连接
       const client = await pool.connect()
       await client.query('SELECT NOW()')
       client.release()
       console.log('✅ PostgreSQL 数据库连接成功')
       return true
+    } else if (supabase) {
+      // 备用 Supabase 连接
+      const { error } = await supabase.from('categories').select('count', { count: 'exact', head: true })
+      if (!error) {
+        console.log('✅ Supabase 数据库连接成功')
+        return true
+      }
     }
     return false
   } catch (error) {
@@ -65,11 +75,8 @@ export async function testConnection(): Promise<boolean> {
 
 // 执行查询
 export async function query(text: string, params?: any[]): Promise<any> {
-  if (isProduction && supabase) {
-    // 生产环境使用 Supabase，这里需要转换 SQL 查询
-    throw new Error('生产环境请使用 CategoryDB 和 WebsiteDB 类的方法')
-  } else if (pool) {
-    // 开发环境使用 PostgreSQL
+  if (pool) {
+    // 使用 PostgreSQL 连接
     const client = await pool.connect()
     try {
       const result = await client.query(text, params)
@@ -86,11 +93,8 @@ export async function query(text: string, params?: any[]): Promise<any> {
 export async function transaction<T>(
   callback: (client: any) => Promise<T>
 ): Promise<T> {
-  if (isProduction && supabase) {
-    // 生产环境使用 Supabase，不需要手动事务管理
-    throw new Error('生产环境请使用 CategoryDB 和 WebsiteDB 类的方法')
-  } else if (pool) {
-    // 开发环境使用 PostgreSQL
+  if (pool) {
+    // 使用 PostgreSQL 事务
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
@@ -141,8 +145,12 @@ export interface DatabaseSettings {
 export class CategoryDB {
   // 获取所有分类
   static async getAll(): Promise<DatabaseCategory[]> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase
+    if (pool) {
+      // 使用 PostgreSQL
+      const result = await query('SELECT * FROM categories ORDER BY name')
+      return result.rows
+    } else if (supabase) {
+      // 备用 Supabase
       const { data, error } = await supabase
         .from('categories')
         .select('*')
@@ -150,10 +158,6 @@ export class CategoryDB {
 
       if (error) throw error
       return data || []
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL
-      const result = await query('SELECT * FROM categories ORDER BY name')
-      return result.rows
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -170,15 +174,8 @@ export class CategoryDB {
 
   // 批量更新分类
   static async upsertMany(categories: Omit<DatabaseCategory, 'created_at' | 'updated_at'>[]): Promise<void> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase 批量操作
-      const { error } = await supabase
-        .from('categories')
-        .upsert(categories, { onConflict: 'id' })
-
-      if (error) throw error
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL 事务
+    if (pool) {
+      // 使用 PostgreSQL 事务
       await transaction(async (client) => {
         for (const category of categories) {
           await client.query(
@@ -190,6 +187,13 @@ export class CategoryDB {
           )
         }
       })
+    } else if (supabase) {
+      // 备用 Supabase 批量操作
+      const { error } = await supabase
+        .from('categories')
+        .upsert(categories, { onConflict: 'id' })
+
+      if (error) throw error
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -200,8 +204,12 @@ export class CategoryDB {
 export class WebsiteDB {
   // 获取所有网站
   static async getAll(): Promise<DatabaseWebsite[]> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase
+    if (pool) {
+      // 使用 PostgreSQL
+      const result = await query('SELECT * FROM websites ORDER BY name')
+      return result.rows
+    } else if (supabase) {
+      // 备用 Supabase
       const { data, error } = await supabase
         .from('websites')
         .select('*')
@@ -209,10 +217,6 @@ export class WebsiteDB {
 
       if (error) throw error
       return data || []
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL
-      const result = await query('SELECT * FROM websites ORDER BY name')
-      return result.rows
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -275,15 +279,8 @@ export class WebsiteDB {
 
   // 批量更新网站
   static async upsertMany(websites: Omit<DatabaseWebsite, 'created_at' | 'updated_at'>[]): Promise<void> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase 批量操作
-      const { error } = await supabase
-        .from('websites')
-        .upsert(websites, { onConflict: 'id' })
-
-      if (error) throw error
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL 事务
+    if (pool) {
+      // 使用 PostgreSQL 事务
       await transaction(async (client) => {
         for (const website of websites) {
           await client.query(
@@ -302,6 +299,13 @@ export class WebsiteDB {
           )
         }
       })
+    } else if (supabase) {
+      // 备用 Supabase 批量操作
+      const { error } = await supabase
+        .from('websites')
+        .upsert(websites, { onConflict: 'id' })
+
+      if (error) throw error
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -312,8 +316,12 @@ export class WebsiteDB {
 export class SettingsDB {
   // 获取设置值
   static async get(key: string): Promise<string | null> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase
+    if (pool) {
+      // 使用 PostgreSQL
+      const result = await query('SELECT value FROM settings WHERE key = $1', [key])
+      return result.rows.length > 0 ? result.rows[0].value : null
+    } else if (supabase) {
+      // 备用 Supabase
       const { data, error } = await supabase
         .from('settings')
         .select('value')
@@ -325,10 +333,6 @@ export class SettingsDB {
         throw error
       }
       return data?.value || null
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL
-      const result = await query('SELECT value FROM settings WHERE key = $1', [key])
-      return result.rows.length > 0 ? result.rows[0].value : null
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -336,15 +340,8 @@ export class SettingsDB {
 
   // 设置值
   static async set(key: string, value: string): Promise<void> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase
-      const { error } = await supabase
-        .from('settings')
-        .upsert({ key, value }, { onConflict: 'key' })
-
-      if (error) throw error
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL
+    if (pool) {
+      // 使用 PostgreSQL
       await query(
         `INSERT INTO settings (key, value)
          VALUES ($1, $2)
@@ -352,6 +349,13 @@ export class SettingsDB {
          DO UPDATE SET value = $2, updated_at = NOW()`,
         [key, value]
       )
+    } else if (supabase) {
+      // 备用 Supabase
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ key, value }, { onConflict: 'key' })
+
+      if (error) throw error
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -359,8 +363,21 @@ export class SettingsDB {
 
   // 获取多个设置
   static async getMultiple(keys: string[]): Promise<Record<string, string>> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase
+    if (pool) {
+      // 使用 PostgreSQL
+      const placeholders = keys.map((_, index) => `$${index + 1}`).join(',')
+      const result = await query(
+        `SELECT key, value FROM settings WHERE key IN (${placeholders})`,
+        keys
+      )
+
+      const settings: Record<string, string> = {}
+      result.rows.forEach((row: any) => {
+        settings[row.key] = row.value
+      })
+      return settings
+    } else if (supabase) {
+      // 备用 Supabase
       const { data, error } = await supabase
         .from('settings')
         .select('key, value')
@@ -373,19 +390,6 @@ export class SettingsDB {
         result[item.key] = item.value
       })
       return result
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL
-      const placeholders = keys.map((_, index) => `$${index + 1}`).join(',')
-      const result = await query(
-        `SELECT key, value FROM settings WHERE key IN (${placeholders})`,
-        keys
-      )
-
-      const settings: Record<string, string> = {}
-      result.rows.forEach((row: any) => {
-        settings[row.key] = row.value
-      })
-      return settings
     } else {
       throw new Error('数据库连接未初始化')
     }
@@ -393,16 +397,8 @@ export class SettingsDB {
 
   // 批量设置
   static async setMultiple(settings: Record<string, string>): Promise<void> {
-    if (isProduction && supabase) {
-      // 生产环境：使用 Supabase
-      const data = Object.entries(settings).map(([key, value]) => ({ key, value }))
-      const { error } = await supabase
-        .from('settings')
-        .upsert(data, { onConflict: 'key' })
-
-      if (error) throw error
-    } else if (pool) {
-      // 开发环境：使用 PostgreSQL
+    if (pool) {
+      // 使用 PostgreSQL
       await transaction(async (client) => {
         for (const [key, value] of Object.entries(settings)) {
           await client.query(
@@ -414,6 +410,14 @@ export class SettingsDB {
           )
         }
       })
+    } else if (supabase) {
+      // 备用 Supabase
+      const data = Object.entries(settings).map(([key, value]) => ({ key, value }))
+      const { error } = await supabase
+        .from('settings')
+        .upsert(data, { onConflict: 'key' })
+
+      if (error) throw error
     } else {
       throw new Error('数据库连接未初始化')
     }
