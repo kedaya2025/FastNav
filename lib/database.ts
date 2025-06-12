@@ -1,6 +1,11 @@
 import { Pool, PoolClient } from 'pg'
 import { createClient } from '@supabase/supabase-js'
 
+// 在生产环境中禁用SSL验证（针对自签名证书）
+if (process.env.NODE_ENV === 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+}
+
 // 检查是否为生产环境
 const isProduction = process.env.NODE_ENV === 'production'
 
@@ -33,7 +38,8 @@ function createDatabasePool() {
       return new Pool({
         connectionString: process.env.POSTGRES_URL,
         ssl: isProduction ? {
-          rejectUnauthorized: false
+          rejectUnauthorized: false,
+          checkServerIdentity: () => undefined
         } : false,
         max: 20,
         idleTimeoutMillis: 30000,
@@ -51,7 +57,8 @@ function createDatabasePool() {
         user: process.env.POSTGRES_USER,
         password: process.env.POSTGRES_PASSWORD,
         ssl: isProduction ? {
-          rejectUnauthorized: false
+          rejectUnauthorized: false,
+          checkServerIdentity: () => undefined
         } : false,
         max: 20,
         idleTimeoutMillis: 30000,
