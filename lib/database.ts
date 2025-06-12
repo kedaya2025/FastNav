@@ -24,33 +24,65 @@ if (process.env.NEXT_PUBLIC_SUPABASE_URL &&
 // PostgreSQL 连接池
 let pool: Pool | null = null
 
-// 优先使用 POSTGRES_URL (Vercel 自动注入)
-if (process.env.POSTGRES_URL) {
-  pool = new Pool({
-    connectionString: process.env.POSTGRES_URL,
-    ssl: isProduction ? {
-      rejectUnauthorized: false
-    } : undefined,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  })
-} else if (process.env.DB_HOST || !isProduction) {
-  // 使用单独的环境变量或本地开发配置
-  pool = new Pool({
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'postgres',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'c83a350cfb60',
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-    ssl: isProduction ? {
-      rejectUnauthorized: false
-    } : undefined,
-  })
+// 数据库连接配置
+function createDatabasePool() {
+  try {
+    // 优先使用 POSTGRES_URL (Vercel 自动注入)
+    if (process.env.POSTGRES_URL) {
+      console.log('🔗 使用 POSTGRES_URL 连接数据库')
+      return new Pool({
+        connectionString: process.env.POSTGRES_URL,
+        ssl: isProduction ? {
+          rejectUnauthorized: false
+        } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      })
+    }
+
+    // 使用 Supabase 环境变量
+    if (process.env.SUPABASE_URL && process.env.POSTGRES_HOST) {
+      console.log('🔗 使用 Supabase Postgres 连接')
+      return new Pool({
+        host: process.env.POSTGRES_HOST,
+        port: parseInt(process.env.POSTGRES_PORT || '5432'),
+        database: process.env.POSTGRES_DATABASE,
+        user: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        ssl: isProduction ? {
+          rejectUnauthorized: false
+        } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      })
+    }
+
+    // 本地开发配置
+    if (!isProduction) {
+      console.log('🔗 使用本地数据库连接')
+      return new Pool({
+        host: process.env.DB_HOST || '127.0.0.1',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME || 'postgres',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'c83a350cfb60',
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+        ssl: false,
+      })
+    }
+
+    return null
+  } catch (error) {
+    console.error('❌ 数据库连接池创建失败:', error)
+    return null
+  }
 }
+
+pool = createDatabasePool()
 
 // 数据库连接测试
 export async function testConnection(): Promise<boolean> {

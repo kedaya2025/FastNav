@@ -4,6 +4,16 @@ import { CategoryDB, testConnection } from '@/lib/database'
 // 获取所有分类
 export async function GET() {
   try {
+    // 先测试数据库连接
+    const connected = await testConnection()
+    if (!connected) {
+      console.error('❌ 数据库连接失败')
+      return NextResponse.json(
+        { success: false, message: '数据库连接失败，请检查数据库配置' },
+        { status: 503 }
+      )
+    }
+
     const categories = await CategoryDB.getAll()
 
     return NextResponse.json({
@@ -13,16 +23,33 @@ export async function GET() {
   } catch (error: any) {
     console.error('获取分类异常:', error)
 
-    // 如果数据库连接失败，返回适当的错误信息
+    // 如果数据库表不存在
     if (error?.code === '42P01') {
       return NextResponse.json(
-        { success: false, message: '数据库表不存在，请先初始化数据库' },
+        {
+          success: false,
+          message: '数据库表不存在，请先初始化数据库',
+          error: 'TABLES_NOT_EXIST',
+          hint: '请访问 /api/admin/init-db 初始化数据库'
+        },
+        { status: 503 }
+      )
+    }
+
+    // SSL证书错误
+    if (error?.code === 'SELF_SIGNED_CERT_IN_CHAIN') {
+      return NextResponse.json(
+        { success: false, message: 'SSL证书验证失败，请检查数据库SSL配置' },
         { status: 503 }
       )
     }
 
     return NextResponse.json(
-      { success: false, message: '数据库连接失败，请检查数据库配置' },
+      {
+        success: false,
+        message: '数据库连接失败: ' + (error?.message || '未知错误'),
+        error: error?.code || 'UNKNOWN_ERROR'
+      },
       { status: 503 }
     )
   }
