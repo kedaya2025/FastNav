@@ -28,10 +28,13 @@ let pool: Pool | null = null
 if (process.env.POSTGRES_URL) {
   pool = new Pool({
     connectionString: process.env.POSTGRES_URL,
-    ssl: isProduction ? { rejectUnauthorized: false } : false,
+    ssl: isProduction ? {
+      rejectUnauthorized: false,
+      require: true
+    } : false,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
   })
 } else if (process.env.DB_HOST || !isProduction) {
   // 使用单独的环境变量或本地开发配置
@@ -43,8 +46,11 @@ if (process.env.POSTGRES_URL) {
     password: process.env.DB_PASSWORD || 'c83a350cfb60',
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-    ssl: isProduction ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 10000,
+    ssl: isProduction ? {
+      rejectUnauthorized: false,
+      require: true
+    } : false,
   })
 }
 
